@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,12 +27,35 @@ SECRET_KEY = 'django-insecure-y(v_l)(o(y-cv6q110yy2s)i8t&lci)xeepcnp%d!95%n3n0*@
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
+AUTH_USER_MODEL = 'user.User'
+
+REST_USE_JWT= True
+
+SIMPLE_JWT = {
+    "SIGNING_KEY": "inhahackathonateamsecretkey",  # JWT 서명에 사용될 비밀 키
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),  # Access Token 유효기간
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),  # Refresh Token 유효기간
+    "ROTATE_REFRESH_TOKENS": False,  # 토큰을 재발급할 때 기존 리프레시 토큰을 유지할지 여부 (현재는 기존 토큰 유지)
+    "BLACKLIST_AFTER_ROTATION": True,  # 토큰이 재발급되면 기존 토큰 블랙리스트에 추가하여 사용 불가 처리
+}
 
 # Application definition
 
 INSTALLED_APPS = [
+    # my app
+    'user',
+    'quest',
+    'point',
+    'item',
+    'reward',
+    'notification',
+    'place',
+    # third app
+    'rest_framework',
+    'rest_framework_simplejwt',
+    # Basic app
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -48,6 +73,18 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",  # 인증된 요청인지 확인
+        # "rest_framework.permissions.AllowAny",  # 누구나 접근 가능
+        # (기본적으로 누구나 접근 가능하게 설정하고, 인증된 요청인지 확인하는 api를 따로 지정하게 하려면
+        # 이 옵션을 위의 옵션 대신 켜주어도 됩니다!)
+    ),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",  # JWT를 통한 인증방식 사용
+    ),
+}
 
 ROOT_URLCONF = 'forest_vacation.urls'
 
