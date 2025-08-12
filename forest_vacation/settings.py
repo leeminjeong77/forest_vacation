@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     # third app
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     # Basic app
     'django.contrib.admin',
     'django.contrib.auth',
