@@ -10,6 +10,8 @@ build/
 
 # 가상환경
 .venv/
+env/
+ENV/
 
 # Django
 *.log
@@ -17,8 +19,8 @@ build/
 *.pyc
 db.sqlite3
 
-# Media & Static (사용자 업로드 / 빌드 결과물)
-media/
+# Media & Static
+/media/
 staticfiles/
 
 # IDE / Editor
@@ -33,6 +35,5 @@ Thumbs.db
 .env
 *.env
 
-# Optional: Migrations 
-**/migrations/*
-!**/migrations/__init__.py
+# Migrations
+**/migrations/__pycache__/
