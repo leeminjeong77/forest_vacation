@@ -24,7 +24,6 @@ class User(AbstractBaseUser):
     gender = models.CharField(max_length=10, blank=True, null=True)
     department = models.CharField(max_length=50, blank=True, null=True)
     point = models.IntegerField(default=0)
-    profile_image = models.ImageField(upload_to='profiles/', blank=True, null=True)
     nickname = models.CharField(max_length=30, blank=True, null=True)
 
    
