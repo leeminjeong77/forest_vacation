@@ -40,6 +40,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("users/", include("user.urls")),
     path('', include('place.urls')),
+    path('points/', include('point.urls')),
 
     re_path(
         r"^swagger(?P<format>\.json|\.yaml)$",
