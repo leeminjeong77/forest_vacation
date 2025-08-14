@@ -2,6 +2,6 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path("", views.UserRewardListView.as_view()),
-    path("<int:pk>/", views.UserRewardUseView.as_view()),
+    path("", views.user_reward_list),
+    path("<int:pk>/", views.use_user_reward),
 ]
