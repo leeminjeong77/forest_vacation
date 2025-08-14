@@ -41,6 +41,7 @@ urlpatterns = [
     path("users/", include("user.urls")),
     path('', include('place.urls')),
     path('points/', include('point.urls')),
+    path('rewards/',include('reward.urls')),
 
     re_path(
         r"^swagger(?P<format>\.json|\.yaml)$",
