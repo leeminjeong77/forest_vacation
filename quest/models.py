@@ -111,3 +111,14 @@ class Stamp(models.Model):
 
     def __str__(self):
         return f"Stamp u={self.user_id}, q={self.quest_id}"
+
+class RefreshLog(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    refreshed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "refreshed_at"])]
+        ordering = ["-refreshed_at"]
+
+    def __str__(self):
+        return f"RefreshLog u={self.user_id}, at={self.refreshed_at}"
