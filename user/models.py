@@ -23,8 +23,12 @@ class User(AbstractBaseUser):
     student_num = models.CharField(max_length=20, unique=True)
     gender = models.CharField(max_length=10, blank=True, null=True)
     department = models.CharField(max_length=50, blank=True, null=True)
-    point = models.IntegerField(default=0)
     nickname = models.CharField(max_length=30, blank=True, null=True)
+
+    @property
+    def point(self):
+        return self.point_transactions.aggregate(total=models.Sum("amount"))["total"] or 0
+
 
    
     is_active = models.BooleanField(default=True)
