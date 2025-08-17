@@ -1,84 +1,70 @@
 from django.db import transaction
-from django.db.models import Q
-from rest_framework import generics, status
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, permissions, status
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
 
-from .models import Quest, RandomQuest, AcceptedQuest
-from .serializers import QuestSerializer, AcceptedQuestSerializer, AcceptedQuestVerifySerializer
+from .models import Quest, RandomQuest, Stamp
+from .serializers import QuestSerializer, RandomQuestSerializer, StampSerializer
 
-
-# 퀘스트 생성
-class QuestCreateView(generics.CreateAPIView):
-    queryset = Quest.objects.all()
+# 퀘스트 목록 + 생성
+class QuestListCreateView(generics.ListCreateAPIView):
+    queryset = Quest.objects.select_related("place").all()
     serializer_class = QuestSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
-# 퀘스트 수락/완료
-# body: {"action": "accept"} / {"action": "complete"}
+# 수락/완료
 class QuestActionView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     @transaction.atomic
-    def post(self, request, pk):
+    def post(self, request, pk: int):
         user = request.user
         action = (request.data.get("action") or "").lower()
 
-        # 존재하는 퀘스트인지 확인
         quest = get_object_or_404(Quest, id=pk)
 
-        random_quest, _ = RandomQuest.objects.get_or_create(
+        # 유저-퀘스트 슬롯 가져오거나 생성
+        rq, _ = RandomQuest.objects.get_or_create(
             user=user, quest=quest,
-            defaults={"is_valid": True}
+            defaults={"status": RandomQuest.Status.RANDOM_LIST},
         )
 
         if action == "accept":
-            # 진행 중(미완료) AcceptedQuest가 있으면 중복 수락 방지
-            exists = AcceptedQuest.objects.filter(
-                random_quest=random_quest, is_verified=False
-            ).exists()
-            if exists:
+            # RANDOM_LIST 에서만 수락 허용
+            if rq.status == RandomQuest.Status.RANDOM_LIST:
+                try:
+                    rq.accept()  # status -> ACCEPTED
+                except ValueError as e:
+                    return Response({"detail": str(e)}, status=400)
                 return Response(
-                    {"detail": "이미 수락한 퀘스트입니다."},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"detail": "퀘스트를 수락했습니다.", "data": RandomQuestSerializer(rq).data},
+                    status=status.HTTP_200_OK
                 )
+            return Response({"detail": "이미 수락되었거나 만료/완료된 퀘스트입니다."}, status=400)
 
-            accepted = AcceptedQuest.objects.create(
-                random_quest=random_quest,
-                is_verified=False
-            )
-            return Response(
-                {"detail": "퀘스트를 수락했습니다.", 
-                 "data": AcceptedQuestSerializer(accepted).data},
-                status=status.HTTP_201_CREATED
-            )
-
-        elif action == "complete":
-            # 해당 유저의 진행중인 퀘스트
-            accepted = AcceptedQuest.objects.filter(
-                random_quest=random_quest, is_verified=False
-            ).first()
-            if not accepted:
+        elif action in ("complete", "clear"):
+            # ACCEPTED 상태에서만 완료 가능
+            if rq.status == RandomQuest.Status.ACCEPTED:
+                try:
+                    rq.clear()  # status -> CLEAR, 내부에서 Stamp.get_or_create(...)
+                except ValueError as e:
+                    return Response({"detail": str(e)}, status=400)
                 return Response(
-                    {"detail": "진행중인 퀘스트가 없습니다."},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"detail": "퀘스트가 완료되었습니다.", "data": RandomQuestSerializer(rq).data},
+                    status=status.HTTP_200_OK
                 )
+            return Response({"detail": "진행 중(ACCEPTED)인 퀘스트가 아닙니다."}, status=400)
 
-            # 완료 처리
-            serializer = AcceptedQuestVerifySerializer(
-                accepted, data={"is_verified": True}, partial=True
-            )
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
+        return Response({"detail": "action은 'accept' 또는 'complete'이어야 합니다."}, status=400)
 
-            return Response(
-                {"detail": "퀘스트가 완료되었습니다.", "data": serializer.data},
-                status=status.HTTP_200_OK
-            )
+# 나의 도감 조회
+class StampListView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = StampSerializer
 
-        else:
-            return Response(
-                {"detail": "action 값이 올바르지 않습니다. ('accept' 또는 'complete')"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+    def get_queryset(self):
+        return Stamp.objects.filter(user=self.request.user).select_related("quest", "quest__place")
