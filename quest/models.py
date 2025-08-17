@@ -1,70 +1,92 @@
 from django.db import models
-from user.models import User
-from place.models import Place
+from django.conf import settings
+from django.utils import timezone
 from django.db.models import Q
-# Create your models here.
 
 class Quest(models.Model):
-    place = models.ForeignKey(Place, on_delete=models.CASCADE)  # 가게
+    place = models.ForeignKey("place.Place", on_delete=models.CASCADE)  # 문자열 참조
     reward_points = models.IntegerField(default=0)
     description = models.TextField()
+
+    # 도감용 이미지
+    image = models.ImageField(upload_to="quests/", blank=True, null=True)  # ✅ 도감용 이미지
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['created_at'])]
+
     def __str__(self):
         return f"{getattr(self.place, 'name', '가게')} 사장님의 부탁({self.reward_points}P)"
-    # 최신순 조회 최적화
-    class Meta:
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['created_at']),
-        ]
+
 
 class RandomQuest(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    class Status(models.TextChoices):
+        RANDOM_LIST = "RANDOM_LIST", "노출 퀘스트"
+        EXPIRED     = "EXPIRED",     "만료 퀘스트"
+        ACCEPTED    = "ACCEPTED",    "수락 퀘스트"
+        CLEAR       = "CLEAR",       "완료 퀘스트"
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)  # 문자열/설정 사용
     quest = models.ForeignKey(Quest, on_delete=models.CASCADE)
-    is_valid = models.BooleanField(default=True)
+    status = models.CharField(max_length=12, choices=Status.choices,
+                              default=Status.RANDOM_LIST, db_index=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
+    # 상태 전이 허용표
+    ALLOWED_TRANSITIONS = {
+        Status.RANDOM_LIST: {Status.ACCEPTED, Status.EXPIRED},
+        Status.ACCEPTED:    {Status.CLEAR, Status.EXPIRED},
+        Status.CLEAR:       set(),
+        Status.EXPIRED:     set(),
+    }
+
     def __str__(self):
-        status = "유효" if self.is_valid else "종료"
-        return f"[{status}] u={self.user_id}, q={self.quest_id}"
+        return f"[{self.status}] u={self.user_id}, q={self.quest_id}"
 
     class Meta:
-        # 유저별 유효 슬롯 조회 최적화
-        indexes = [
-            models.Index(fields=['user', 'is_valid']),
-        ]
-        # 퀘스트 중복 등록 방지 (퀘스트 3개 다르게)
+        indexes = [models.Index(fields=['user', 'status'])]
         constraints = [
-            models.UniqueConstraint(
-                fields=['user', 'quest'],
-                condition=Q(is_valid=True),
-                name='uq_active_randomquest_per_user_quest',
-            ),
+            models.UniqueConstraint(fields=['user', 'quest'], name='uq_randomquest_user_quest'),
         ]
 
-class AcceptedQuest(models.Model):
-    random_quest = models.ForeignKey(RandomQuest, on_delete=models.CASCADE)
-    is_verified = models.BooleanField(default=False)
+    # 전이 로직
+    def _set_status(self, new_status, *, extra_updates=None):
+        cur = self.status
+        if new_status not in self.ALLOWED_TRANSITIONS.get(cur, set()):
+            raise ValueError(f"Invalid transition: {cur} -> {new_status}")
+        self.status = new_status
+        self.updated_at = timezone.now()
+        update_fields = ['status', 'updated_at']
+        if extra_updates:
+            for k, v in extra_updates.items():
+                setattr(self, k, v)
+                update_fields.append(k)
+        self.save(update_fields=update_fields)
 
+    def accept(self):
+        self._set_status(self.Status.ACCEPTED)
+
+    def clear(self):
+        self._set_status(self.Status.CLEAR)
+        Stamp.objects.get_or_create(user=self.user, quest=self.quest)
+
+    def expire(self):
+        self._set_status(self.Status.EXPIRED)
+
+
+class Stamp(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='stamps')
+    quest = models.ForeignKey(Quest, on_delete=models.CASCADE, related_name='stamps')
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"RQ={self.random_quest_id}, 완료={self.is_verified}"
 
     class Meta:
+        unique_together = ('user', 'quest')
         ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['is_verified']),
-            models.Index(fields=['created_at']),
-        ]
-        constraints = [
-            # 진행중(False) 상태에서 같은 random_quest 중복 방지
-            models.UniqueConstraint(
-                fields=['random_quest'],
-                condition=Q(is_verified=False),
-                name='uq_active_accept_for_randomquest',
-            ),
-        ]
+
+    def __str__(self):
+        return f"Stamp u={self.user_id}, q={self.quest_id}"

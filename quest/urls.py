@@ -1,7 +1,8 @@
 from django.urls import path
-from .views import QuestCreateView, QuestActionView
+from .views import QuestListCreateView, QuestActionView, StampListView
 
 urlpatterns = [
-    path('', QuestCreateView.as_view(), name='quest-create'),
-    path('<int:pk>/', QuestActionView.as_view(), name='quest-action'),
+    path("", QuestListCreateView.as_view(), name="quest-list-create"),           
+    path("<int:pk>/", QuestActionView.as_view(), name="quest-action"),
+    path("stamps/", StampListView.as_view(), name="stamp-list"),
 ]
