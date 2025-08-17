@@ -1,15 +1,11 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
-from django.db.models import Q
 
 class Quest(models.Model):
-    place = models.ForeignKey("place.Place", on_delete=models.CASCADE)  # 문자열 참조
-    reward_points = models.IntegerField(default=0)
+    place = models.ForeignKey("place.Place", on_delete=models.CASCADE)
+    reward_points = models.IntegerField(default=0)  # 포인트 보상
     description = models.TextField()
-
-    # 도감용 이미지
-    image = models.ImageField(upload_to="quests/", blank=True, null=True)  # ✅ 도감용 이미지
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -29,7 +25,7 @@ class RandomQuest(models.Model):
         ACCEPTED    = "ACCEPTED",    "수락 퀘스트"
         CLEAR       = "CLEAR",       "완료 퀘스트"
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)  # 문자열/설정 사용
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     quest = models.ForeignKey(Quest, on_delete=models.CASCADE)
     status = models.CharField(max_length=12, choices=Status.choices,
                               default=Status.RANDOM_LIST, db_index=True)
@@ -37,7 +33,6 @@ class RandomQuest(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # 상태 전이 허용표
     ALLOWED_TRANSITIONS = {
         Status.RANDOM_LIST: {Status.ACCEPTED, Status.EXPIRED},
         Status.ACCEPTED:    {Status.CLEAR, Status.EXPIRED},
@@ -54,7 +49,6 @@ class RandomQuest(models.Model):
             models.UniqueConstraint(fields=['user', 'quest'], name='uq_randomquest_user_quest'),
         ]
 
-    # 전이 로직
     def _set_status(self, new_status, *, extra_updates=None):
         cur = self.status
         if new_status not in self.ALLOWED_TRANSITIONS.get(cur, set()):
@@ -72,8 +66,35 @@ class RandomQuest(models.Model):
         self._set_status(self.Status.ACCEPTED)
 
     def clear(self):
+        from point.models import PointTransaction
+        from notification.models import Notification
+
         self._set_status(self.Status.CLEAR)
-        Stamp.objects.get_or_create(user=self.user, quest=self.quest)
+
+        # 스탬프 생성
+        stamp, created = Stamp.objects.get_or_create(user=self.user, quest=self.quest)
+
+        # 포인트 지급
+        points_added = 0
+        if self.quest.reward_points > 0:
+            PointTransaction.objects.create(
+                user=self.user,
+                amount=self.quest.reward_points,
+                reason=f"퀘스트 완료: {self.quest.description}"
+            )
+            Notification.objects.create(
+                user=self.user,
+                title="퀘스트 완료",
+                content=f"{self.quest.reward_points} 포인트가 적립되었습니다."
+            )
+            points_added = self.quest.reward_points
+
+        return {
+            "stamp_created": created,
+            "points_added": points_added,
+            "notification": "퀘스트 완료 알림이 발송되었습니다." if points_added else None
+        }
+
 
     def expire(self):
         self._set_status(self.Status.EXPIRED)

@@ -1,22 +1,21 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Quest, RandomQuest, Stamp
 from .serializers import QuestSerializer, RandomQuestSerializer, StampSerializer
 
-# 퀘스트 목록 + 생성
+
+# 퀘스트 목록 조회 + 생성
 class QuestListCreateView(generics.ListCreateAPIView):
     queryset = Quest.objects.select_related("place").all()
     serializer_class = QuestSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
-# 수락/완료
+
+# 퀘스트 수락 / 완료
 class QuestActionView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -34,14 +33,17 @@ class QuestActionView(APIView):
         )
 
         if action == "accept":
-            # RANDOM_LIST 에서만 수락 허용
+            # RANDOM_LIST 상태에서만 수락 가능
             if rq.status == RandomQuest.Status.RANDOM_LIST:
                 try:
-                    rq.accept()  # status -> ACCEPTED
+                    rq.accept()
                 except ValueError as e:
                     return Response({"detail": str(e)}, status=400)
                 return Response(
-                    {"detail": "퀘스트를 수락했습니다.", "data": RandomQuestSerializer(rq).data},
+                    {
+                        "detail": "퀘스트를 수락했습니다.",
+                        "data": RandomQuestSerializer(rq).data,
+                    },
                     status=status.HTTP_200_OK
                 )
             return Response({"detail": "이미 수락되었거나 만료/완료된 퀘스트입니다."}, status=400)
@@ -50,16 +52,21 @@ class QuestActionView(APIView):
             # ACCEPTED 상태에서만 완료 가능
             if rq.status == RandomQuest.Status.ACCEPTED:
                 try:
-                    rq.clear()  # status -> CLEAR, 내부에서 Stamp.get_or_create(...)
+                    result = rq.clear()  # stamp, point, notification 처리 후 반환
                 except ValueError as e:
                     return Response({"detail": str(e)}, status=400)
                 return Response(
-                    {"detail": "퀘스트가 완료되었습니다.", "data": RandomQuestSerializer(rq).data},
+                    {
+                        "detail": "퀘스트가 완료되었습니다.",
+                        "data": RandomQuestSerializer(rq).data,
+                        "extra": result,  # 포인트/알람/도감 처리 결과
+                    },
                     status=status.HTTP_200_OK
                 )
             return Response({"detail": "진행 중(ACCEPTED)인 퀘스트가 아닙니다."}, status=400)
 
         return Response({"detail": "action은 'accept' 또는 'complete'이어야 합니다."}, status=400)
+
 
 # 나의 도감 조회
 class StampListView(generics.ListAPIView):
