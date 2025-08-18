@@ -11,7 +11,6 @@ class UserSerializer(serializers.ModelSerializer):
             "gender",
             "department",
             "point",
-            "profile_image",
             "nickname",
         ]
         extra_kwargs = {
@@ -30,5 +29,4 @@ class UserInfoSerializer(serializers.ModelSerializer):
             "department",
             "nickname",
             "point",
-            "profile_image",
         ]

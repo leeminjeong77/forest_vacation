@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
 
 # Create your models here.
@@ -23,9 +24,12 @@ class User(AbstractBaseUser):
     student_num = models.CharField(max_length=20, unique=True)
     gender = models.CharField(max_length=10, blank=True, null=True)
     department = models.CharField(max_length=50, blank=True, null=True)
-    point = models.IntegerField(default=0)
-    profile_image = models.ImageField(upload_to='profiles/', blank=True, null=True)
     nickname = models.CharField(max_length=30, blank=True, null=True)
+
+    @property
+    def point(self):
+        return self.point_transactions.aggregate(total=models.Sum("amount"))["total"] or 0
+
 
    
     is_active = models.BooleanField(default=True)
@@ -52,3 +56,14 @@ class User(AbstractBaseUser):
     
     class Meta:
         db_table = 'user'
+
+class RefreshLog(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    refreshed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "refreshed_at"])]
+        ordering = ["-refreshed_at"]
+
+    def __str__(self):
+        return f"RefreshLog u={self.user_id}, at={self.refreshed_at}"
