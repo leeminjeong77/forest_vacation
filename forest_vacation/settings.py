@@ -53,11 +53,11 @@ INSTALLED_APPS = [
     'notification',
     'place',
     # third app
+    'corsheaders',
     'rest_framework',
     'drf_yasg',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
-    'corsheaders',
     # Basic app
     'django.contrib.admin',
     'django.contrib.auth',
@@ -115,8 +115,6 @@ CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
     "https://inhu-forest.p-e.kr",
-    "http://localhost:8080",      # 개발용
-    "http://127.0.0.1:8000",      # 개발용
 ]
 
 ROOT_URLCONF = 'forest_vacation.urls'
