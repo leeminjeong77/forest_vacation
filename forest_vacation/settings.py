@@ -14,6 +14,8 @@ from pathlib import Path
 from datetime import timedelta
 import os
 
+from .. import config
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -23,6 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-y(v_l)(o(y-cv6q110yy2s)i8t&lci)xeepcnp%d!95%n3n0*@'
+OPENAI_API_KEY = config.OPENAI_API_KEY
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -52,6 +55,9 @@ INSTALLED_APPS = [
     'reward',
     'notification',
     'place',
+    'session',
+    'summary',
+    'message',
     # third app
     'rest_framework',
     'drf_yasg',
