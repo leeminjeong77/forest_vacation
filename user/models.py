@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser
 
 # Create your models here.
@@ -55,3 +56,14 @@ class User(AbstractBaseUser):
     
     class Meta:
         db_table = 'user'
+
+class RefreshLog(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    refreshed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "refreshed_at"])]
+        ordering = ["-refreshed_at"]
+
+    def __str__(self):
+        return f"RefreshLog u={self.user_id}, at={self.refreshed_at}"

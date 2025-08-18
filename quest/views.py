@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
 import random
-
-from .models import Quest, RandomQuest, Stamp, RefreshLog
+from user.models import  RefreshLog
+from .models import Quest, RandomQuest, Stamp
 from .serializers import QuestSerializer, RandomQuestSerializer, StampSerializer
 
 
