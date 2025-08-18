@@ -44,9 +44,9 @@ urlpatterns = [
     path('points/', include('point.urls')),
     path('rewards/',include('reward.urls')),
     path('notifications/',include('notification.urls')),
-    path('sessions/', include('session.urls')),
-    path('summaries/', include('summary.urls')),
-    path('messages/', include('message.urls')),
+    path('chat/sessions/', include('session.urls')),
+    path('chat/summaries/', include('summary.urls')),
+    path('chat/messages/', include('message.urls')),
 
     re_path(
         r"^swagger(?P<format>\.json|\.yaml)$",
