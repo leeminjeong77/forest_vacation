@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# 가상환경
+.venv/
+env/
+ENV/
+venv/
+
+# Django
+*.log
+*.pot
+*.pyc
+db.sqlite3
+
+# Media & Static
+/media/
+staticfiles/
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Environment / Secrets
+.env
+*.env
+
+# Migrations
+**/migrations/__pycache__/
