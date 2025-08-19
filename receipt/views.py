@@ -18,53 +18,127 @@ class ReceiptUploadView(APIView):
 
     def post(self, request):
         serializer = ReceiptCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            receipt = serializer.save(user=request.user)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            # OCR API 요청
-            payload = {"version": "V2", "requestId": str(uuid.uuid4()), "timestamp": int(time.time() * 1000), "images": [{"format": "jpg", "name": "receipt"}]}
+        receipt = serializer.save(user=request.user)
 
-            files = {'file': receipt.image.open("rb"),'message': (None, json.dumps(payload), 'application/json')}
+        # OCR API 요청
+        payload = {
+            "version": "V2",
+            "requestId": str(uuid.uuid4()),
+            "timestamp": int(time.time() * 1000),
+            "images": [{"format": "jpg", "name": "receipt"}],
+        }
 
-            headers = {"X-OCR-SECRET": settings.CLOVA_OCR_SECRET_KEY}
-            response = requests.post(settings.CLOVA_OCR_INVOKE_URL,headers=headers,files=files)
+        files = {
+            "file": receipt.image.open("rb"),
+            "message": (None, json.dumps(payload), "application/json"),
+        }
 
-            extra = None
+        headers = {"X-OCR-SECRET": settings.CLOVA_OCR_SECRET_KEY}
+        response = requests.post(
+            settings.CLOVA_OCR_INVOKE_URL, headers=headers, files=files
+        )
 
-            if response.status_code == 200:
-                data = response.json()
+        extra = None
 
-                receipt.ocr_uid = data.get("images", [{}])[0].get("uid")
-                receipt.status = Receipt.Status.SUCCESS
-                receipt.message = "인식 성공"
+        if response.status_code == 200:
+            data = response.json()
 
-                store_name = (data.get("images", [{}])[0].get("receipt", {}).get("result", {}).get("storeInfo", {}).get("name", {}).get("text"))
-                total_price = (data.get("images", [{}])[0].get("receipt", {}).get("result", {}).get("totalPrice", {}).get("price", {}).get("formatted"))
+            receipt.ocr_uid = data.get("images", [{}])[0].get("uid")
+            receipt.status = Receipt.Status.SUCCESS
+            receipt.message = "인식 성공"
 
-                receipt.store_name = store_name
-                receipt.total_price = int(total_price) if total_price else None
-                receipt.save()
+            store_name = (
+                data.get("images", [{}])[0]
+                .get("receipt", {})
+                .get("result", {})
+                .get("storeInfo", {})
+                .get("name", {})
+                .get("text")
+            )
+            total_price = (
+                data.get("images", [{}])[0]
+                .get("receipt", {})
+                .get("result", {})
+                .get("totalPrice", {})
+                .get("price", {})
+                .get("formatted")
+            )
 
-                # 퀘스트 완료 처리
-                rq = RandomQuest.objects.filter(user=request.user, quest=receipt.quest).first()
-                if rq:
-                    if rq.status == RandomQuest.Status.ACCEPTED:
-                        try:
-                            extra = rq.clear()
-                        except ValueError as e:
-                            extra = {"detail": f"퀘스트 완료 처리 실패: {str(e)}"}
-                    else:
-                        extra = {"detail": "이미 완료된 퀘스트입니다."}
+            receipt.store_name = store_name
+            receipt.total_price = int(total_price) if total_price else None
+            receipt.save()
 
+            # 퀘스트 완료 처리
+            rq = RandomQuest.objects.filter(
+                user=request.user, quest=receipt.quest
+            ).first()
+
+            if rq:
+                handlers = {
+                    RandomQuest.Status.ACCEPTED: self._handle_accepted,
+                    RandomQuest.Status.CLEAR: self._handle_clear,
+                    RandomQuest.Status.RANDOM_LIST: self._handle_invalid,
+                    RandomQuest.Status.EXPIRED: self._handle_invalid,
+                }
+                handler = handlers.get(rq.status, self._handle_not_found)
+                extra = handler(receipt, rq)
             else:
                 receipt.status = Receipt.Status.FAILURE
-                receipt.message = f"OCR 실패 ({response.status_code})"
+                receipt.message = "해당 퀘스트를 찾을 수 없습니다."
                 receipt.save()
 
-            response_data = ReceiptSerializer(receipt).data
-            if extra:
-                response_data["extra"] = extra
+        else:
+            receipt.status = Receipt.Status.FAILURE
+            receipt.message = f"OCR 실패 ({response.status_code})"
+            receipt.save()
 
-            return Response(response_data, status=status.HTTP_201_CREATED)
+        response_data = ReceiptSerializer(receipt).data
+        if extra:
+            response_data["extra"] = extra
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(response_data, status=status.HTTP_201_CREATED)
+
+    # --- 상태별 핸들러 메서드들 ---
+
+    def _handle_accepted(self, receipt, rq):
+        """수락된 퀘스트 → OCR 결과와 place 이름 비교"""
+        if (
+            receipt.store_name
+            and receipt.quest.place.name
+            and receipt.store_name.strip() == receipt.quest.place.name.strip()
+        ):
+            try:
+                receipt.status = Receipt.Status.SUCCESS
+                receipt.message = "영수증 인증 성공"
+                extra = rq.clear()
+            except ValueError as e:
+                receipt.status = Receipt.Status.FAILURE
+                receipt.message = f"퀘스트 완료 처리 실패: {str(e)}"
+                extra = {"detail": receipt.message}
+        else:
+            receipt.status = Receipt.Status.FAILURE
+            receipt.message = "가게명이 일치하지 않습니다."
+            extra = {"detail": receipt.message}
+
+        receipt.save()
+        return extra
+
+    def _handle_clear(self, receipt, rq):
+        """이미 완료된 퀘스트"""
+        receipt.status = Receipt.Status.FAILURE
+        receipt.message = "이미 완료된 퀘스트입니다."
+        receipt.save()
+        return {"detail": receipt.message}
+
+    def _handle_invalid(self, receipt, rq):
+        """수락되지 않은 상태 (랜덤 노출 or 만료)"""
+        receipt.status = Receipt.Status.FAILURE
+        receipt.message = "수락되지 않은 퀘스트입니다."
+        receipt.save()
+        return {"detail": receipt.message}
+
+    def _handle_not_found(self, receipt, rq):
+        """퀘스트 자체를 찾을 수 없을 때"""
