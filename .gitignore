@@ -38,3 +38,6 @@ Thumbs.db
 
 # Migrations
 **/migrations/__pycache__/
+
+# 영수증 이미지
+/receipts/

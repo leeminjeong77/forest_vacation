@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from decouple import config
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -43,6 +44,10 @@ SIMPLE_JWT = {
 
 # Application definition
 
+# CLOVA OCR KEY
+CLOVA_OCR_SECRET_KEY = config("CLOVA_OCR_SECRET_KEY")
+CLOVA_OCR_INVOKE_URL = config("CLOVA_OCR_INVOKE_URL")
+
 INSTALLED_APPS = [
     # my app
     'user',
@@ -52,6 +57,7 @@ INSTALLED_APPS = [
     'reward',
     'notification',
     'place',
+    'receipt',
     # third app
     'corsheaders',
     'rest_framework',
