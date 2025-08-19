@@ -43,6 +43,7 @@ urlpatterns = [
     path('quests/', include('quest.urls')), 
     path('points/', include('point.urls')),
     path('rewards/',include('reward.urls')),
+    path("receipts/", include("receipt.urls")),
     path('notifications/',include('notification.urls')),
 
 
