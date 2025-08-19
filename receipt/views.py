@@ -1,7 +1,4 @@
-import json
-import uuid
-import time
-import requests
+import json, uuid, time, requests
 from django.conf import settings
 from rest_framework import status
 from rest_framework.response import Response
@@ -24,58 +21,29 @@ class ReceiptUploadView(APIView):
         receipt = serializer.save(user=request.user)
 
         # OCR API 요청
-        payload = {
-            "version": "V2",
-            "requestId": str(uuid.uuid4()),
-            "timestamp": int(time.time() * 1000),
-            "images": [{"format": "jpg", "name": "receipt"}],
-        }
-
-        files = {
-            "file": receipt.image.open("rb"),
-            "message": (None, json.dumps(payload), "application/json"),
-        }
-
+        payload = {"version": "V2", "requestId": str(uuid.uuid4()), "timestamp": int(time.time() * 1000), "images": [{"format": "jpg", "name": "receipt"}]}
+        files = {"file": receipt.image.open("rb"), "message": (None, json.dumps(payload), "application/json")}
         headers = {"X-OCR-SECRET": settings.CLOVA_OCR_SECRET_KEY}
-        response = requests.post(
-            settings.CLOVA_OCR_INVOKE_URL, headers=headers, files=files
-        )
 
+        response = requests.post(settings.CLOVA_OCR_INVOKE_URL, headers=headers, files=files)
         extra = None
 
         if response.status_code == 200:
             data = response.json()
-
             receipt.ocr_uid = data.get("images", [{}])[0].get("uid")
             receipt.status = Receipt.Status.SUCCESS
             receipt.message = "인식 성공"
 
-            store_name = (
-                data.get("images", [{}])[0]
-                .get("receipt", {})
-                .get("result", {})
-                .get("storeInfo", {})
-                .get("name", {})
-                .get("text")
-            )
-            total_price = (
-                data.get("images", [{}])[0]
-                .get("receipt", {})
-                .get("result", {})
-                .get("totalPrice", {})
-                .get("price", {})
-                .get("formatted")
-            )
+            # OCR 결과에서 가게명 / 총액 추출
+            store_name = data.get("images", [{}])[0].get("receipt", {}).get("result", {}).get("storeInfo", {}).get("name", {}).get("text")
+            total_price = data.get("images", [{}])[0].get("receipt", {}).get("result", {}).get("totalPrice", {}).get("price", {}).get("formatted")
 
             receipt.store_name = store_name
             receipt.total_price = int(total_price) if total_price else None
             receipt.save()
 
             # 퀘스트 완료 처리
-            rq = RandomQuest.objects.filter(
-                user=request.user, quest=receipt.quest
-            ).first()
-
+            rq = RandomQuest.objects.filter(user=request.user, quest=receipt.quest).first()
             if rq:
                 handlers = {
                     RandomQuest.Status.ACCEPTED: self._handle_accepted,
@@ -89,7 +57,6 @@ class ReceiptUploadView(APIView):
                 receipt.status = Receipt.Status.FAILURE
                 receipt.message = "해당 퀘스트를 찾을 수 없습니다."
                 receipt.save()
-
         else:
             receipt.status = Receipt.Status.FAILURE
             receipt.message = f"OCR 실패 ({response.status_code})"
@@ -98,18 +65,12 @@ class ReceiptUploadView(APIView):
         response_data = ReceiptSerializer(receipt).data
         if extra:
             response_data["extra"] = extra
-
         return Response(response_data, status=status.HTTP_201_CREATED)
 
-    # --- 상태별 핸들러 메서드들 ---
-
+    # --- 상태별 핸들러 메서드 ---
     def _handle_accepted(self, receipt, rq):
         """수락된 퀘스트 → OCR 결과와 place 이름 비교"""
-        if (
-            receipt.store_name
-            and receipt.quest.place.name
-            and receipt.store_name.strip() == receipt.quest.place.name.strip()
-        ):
+        if receipt.store_name and receipt.quest.place.name and receipt.store_name.strip() == receipt.quest.place.name.strip():
             try:
                 receipt.status = Receipt.Status.SUCCESS
                 receipt.message = "영수증 인증 성공"
@@ -122,7 +83,6 @@ class ReceiptUploadView(APIView):
             receipt.status = Receipt.Status.FAILURE
             receipt.message = "가게명이 일치하지 않습니다."
             extra = {"detail": receipt.message}
-
         receipt.save()
         return extra
 
@@ -141,4 +101,8 @@ class ReceiptUploadView(APIView):
         return {"detail": receipt.message}
 
     def _handle_not_found(self, receipt, rq):
-        """퀘스트 자체를 찾을 수 없을 때"""
+        """퀘스트를 찾을 수 없을 때"""
+        receipt.status = Receipt.Status.FAILURE
+        receipt.message = "해당 퀘스트를 찾을 수 없습니다."
+        receipt.save()
+        return {"detail": receipt.message}

@@ -27,12 +27,12 @@ class RandomQuest(models.Model):
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     quest = models.ForeignKey(Quest, on_delete=models.CASCADE)
-    status = models.CharField(max_length=12, choices=Status.choices,
-                              default=Status.RANDOM_LIST, db_index=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.RANDOM_LIST, db_index=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # 상태 전환 허용 규칙
     ALLOWED_TRANSITIONS = {
         Status.RANDOM_LIST: {Status.ACCEPTED, Status.EXPIRED},
         Status.ACCEPTED:    {Status.CLEAR, Status.EXPIRED},
@@ -45,11 +45,10 @@ class RandomQuest(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=['user', 'status'])]
-        constraints = [
-            models.UniqueConstraint(fields=['user', 'quest'], name='uq_randomquest_user_quest'),
-        ]
+        constraints = [models.UniqueConstraint(fields=['user', 'quest'], name='uq_randomquest_user_quest')]
 
     def _set_status(self, new_status, *, extra_updates=None):
+        """상태 전환 유효성 체크 후 변경"""
         cur = self.status
         if new_status not in self.ALLOWED_TRANSITIONS.get(cur, set()):
             raise ValueError(f"Invalid transition: {cur} -> {new_status}")
@@ -63,40 +62,30 @@ class RandomQuest(models.Model):
         self.save(update_fields=update_fields)
 
     def accept(self):
+        """퀘스트 수락"""
         self._set_status(self.Status.ACCEPTED)
 
     def clear(self):
+        """퀘스트 완료 처리: 스탬프 생성 + 포인트 지급 + 알림 생성"""
         from point.models import PointTransaction
         from notification.models import Notification
 
         self._set_status(self.Status.CLEAR)
 
-        # 스탬프 생성
+        # 스탬프 생성 (중복 방지)
         stamp, created = Stamp.objects.get_or_create(user=self.user, quest=self.quest)
 
-        # 포인트 지급
+        # 포인트 지급 및 알림 발송
         points_added = 0
         if self.quest.reward_points > 0:
-            PointTransaction.objects.create(
-                user=self.user,
-                amount=self.quest.reward_points,
-                reason=f"퀘스트 완료: {self.quest.description}"
-            )
-            Notification.objects.create(
-                user=self.user,
-                title="퀘스트 완료",
-                content=f"{self.quest.reward_points} 포인트가 적립되었습니다."
-            )
+            PointTransaction.objects.create(user=self.user, amount=self.quest.reward_points, reason=f"퀘스트 완료: {self.quest.description}")
+            Notification.objects.create(user=self.user, title="퀘스트 완료", content=f"{self.quest.reward_points} 포인트가 적립되었습니다.")
             points_added = self.quest.reward_points
 
-        return {
-            "stamp_created": created,
-            "points_added": points_added,
-            "notification": "퀘스트 완료 알림이 발송되었습니다." if points_added else None
-        }
-
+        return {"stamp_created": created, "points_added": points_added, "notification": "퀘스트 완료 알림이 발송되었습니다." if points_added else None}
 
     def expire(self):
+        """퀘스트 만료 처리"""
         self._set_status(self.Status.EXPIRED)
 
 
@@ -111,4 +100,3 @@ class Stamp(models.Model):
 
     def __str__(self):
         return f"Stamp u={self.user_id}, q={self.quest_id}"
-
