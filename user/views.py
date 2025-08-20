@@ -49,9 +49,9 @@ def login(request):
     update_last_login(None, user)
     return Response(
         {  
-            "user_id": user.id,
             "refresh_token": str(refresh),
             "access_token": str(refresh.access_token),
+            "user": UserInfoSerializer(user).data,
         },
         status=200,
     )
