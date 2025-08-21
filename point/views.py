@@ -3,6 +3,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Sum
 from .models import PointTransaction
+from quest.models import RandomQuest
+from receipt.models import Receipt
 from reward.models import Reward, UserReward
 from notification.models import Notification
 from .serializers import QuestCompleteSerializer, VoucherUseSerializer, PointTransactionSerializer
@@ -15,18 +17,36 @@ def quest_complete(request):
     serializer.is_valid(raise_exception=True)
 
     user = request.user
-    quest_name = serializer.validated_data['quest_name']
+    quest_id = serializer.validated_data['quest_id']
+    
+     # (1) 영수증 인증 성공 여부 확인
+    verified = Receipt.objects.filter(
+        user=user,
+        quest_id=quest_id,
+        status=Receipt.Status.SUCCESS
+    ).exists()
 
-    # 포인트 정책 (퀘스트별)
-    QUEST_POINT_MAP = {
-        "영수증 인증 미션": 100,
-    }
-    points = QUEST_POINT_MAP.get(quest_name)
-    if points is None:
-        return Response({"error": "해당 퀘스트에 대한 포인트 정책이 없습니다."}, status=400)
+    if not verified:
+        return Response({"error": "영수증 인증이 완료되지 않았습니다."}, status=400)
+
+   # (2) 진행중 or 완료 상태 확인
+    try:
+        rq = RandomQuest.objects.get(
+            user=user,
+            quest_id=quest_id,
+            status__in=[RandomQuest.Status.ACCEPTED, RandomQuest.Status.CLEAR]
+        )
+    except RandomQuest.DoesNotExist:
+        return Response({"error": "진행 중인 퀘스트가 아닙니다."}, status=400)
+    
+    # (3) clear() 실행 (완료 퀘스트로 상태 변경 + 도감 생성)
+    if rq.status != RandomQuest.Status.CLEAR:
+        rq.clear()
 
     # 포인트 적립
-    reason = f"퀘스트 완료: {quest_name}"
+    points = rq.quest.reward_points
+
+    reason = f"퀘스트 완료: {quest_id}"
     transaction = PointTransaction.objects.create(
         user=user,
         amount=points,

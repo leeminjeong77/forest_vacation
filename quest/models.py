@@ -66,7 +66,7 @@ class RandomQuest(models.Model):
         self._set_status(self.Status.ACCEPTED)
 
     def clear(self):
-        """퀘스트 완료 처리: 스탬프 생성 + 포인트 지급 + 알림 생성"""
+        """퀘스트 완료 처리: 스탬프 생성"""
         from point.models import PointTransaction
         from notification.models import Notification
 
@@ -75,14 +75,7 @@ class RandomQuest(models.Model):
         # 스탬프 생성 (중복 방지)
         stamp, created = Stamp.objects.get_or_create(user=self.user, quest=self.quest)
 
-        # 포인트 지급 및 알림 발송
-        points_added = 0
-        if self.quest.reward_points > 0:
-            PointTransaction.objects.create(user=self.user, amount=self.quest.reward_points, reason=f"퀘스트 완료: {self.quest.description}")
-            Notification.objects.create(user=self.user, title="퀘스트 완료", content=f"{self.quest.reward_points} 포인트가 적립되었습니다.")
-            points_added = self.quest.reward_points
-
-        return {"stamp_created": created, "points_added": points_added, "notification": "퀘스트 완료 알림이 발송되었습니다." if points_added else None}
+        return {"stamp_created": created}
 
     def expire(self):
         """퀘스트 만료 처리"""
