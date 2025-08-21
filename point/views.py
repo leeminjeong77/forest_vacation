@@ -59,9 +59,6 @@ def voucher_use(request):
     if not reward:
         return Response({"error": "해당 교환권이 없습니다."}, status=404)
 
-    current_points = user.point_transactions.aggregate(total=Sum('amount'))['total'] or 0
-    if current_points < reward.price:
-        return Response({"error": "포인트가 부족합니다."}, status=400)
 
     # 포인트 차감
     reason = f"교환권 구매: {reward.name}"

@@ -188,6 +188,9 @@ class QuestActionView(APIView):
             if rq.status == RandomQuest.Status.ACCEPTED:
                 try:
                     result = rq.clear()
+                    
+            
+
                 except ValueError as e:
                     return Response({"detail": str(e)}, status=400)
                 return Response(
