@@ -4,7 +4,12 @@ from .models import Reward, UserReward
 class RewardSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reward
-        fields = ['id', 'name', 'image', 'price', 'created_at']
+        fields = ['id', 'name', 'image', 'price', 'weight', 'created_at']
+
+class RewardCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reward
+        fields = ['name', 'image', 'price', 'weight']
 
 class UserRewardSerializer(serializers.ModelSerializer):
     reward = RewardSerializer()
