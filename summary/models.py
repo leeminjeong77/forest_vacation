@@ -1,12 +1,12 @@
 from django.db import models
 
-from user.models import User
+from session.models import Session
 
 
 # Create your models here.
 
 class Summary(models.Model):
-    session = models.ForeignKey(User, on_delete=models.CASCADE, related_name="summaries")
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name="summaries")
     summary_text = models.TextField()
     sum_seq = models.IntegerField()
 
