@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from openai import OpenAI
 
-from .. import config
+import config
 
 from django.shortcuts import render
 from django.conf import settings
