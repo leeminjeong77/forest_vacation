@@ -71,20 +71,16 @@ class ReceiptUploadView(APIView):
     def _handle_accepted(self, receipt, rq):
         """수락된 퀘스트 → OCR 결과와 place 이름 비교"""
         if receipt.store_name and receipt.quest.place.name and receipt.store_name.strip() == receipt.quest.place.name.strip():
-            try:
-                receipt.status = Receipt.Status.SUCCESS
-                receipt.message = "영수증 인증 성공"
-                extra = rq.clear()
-            except ValueError as e:
-                receipt.status = Receipt.Status.FAILURE
-                receipt.message = f"퀘스트 완료 처리 실패: {str(e)}"
-                extra = {"detail": receipt.message}
+            receipt.status = Receipt.Status.SUCCESS
+            receipt.message = "영수증 인증 성공"
+            extra = {"detail": "인증 성공. 포인트 적립은 /points/quest/complete/ 호출 필요"}
         else:
             receipt.status = Receipt.Status.FAILURE
             receipt.message = "가게명이 일치하지 않습니다."
             extra = {"detail": receipt.message}
         receipt.save()
         return extra
+
 
     def _handle_clear(self, receipt, rq):
         """이미 완료된 퀘스트"""
