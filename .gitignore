@@ -41,3 +41,5 @@ Thumbs.db
 
 # 영수증 이미지
 /receipts/
+
+config.py

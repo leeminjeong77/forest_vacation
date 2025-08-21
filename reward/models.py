@@ -5,6 +5,7 @@ class Reward(models.Model):
     name = models.CharField(max_length=100)
     image = models.ImageField(upload_to='rewards/', blank=True, null=True)
     price = models.IntegerField(default=0)  # 교환에 필요한 포인트
+    weight = models.IntegerField(default=0)  # 보상 확률 가중치
     created_at = models.DateTimeField(auto_now_add=True)
 
 class UserReward(models.Model):
