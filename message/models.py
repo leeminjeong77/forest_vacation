@@ -1,11 +1,11 @@
 from django.db import models
 
-from user.models import User
+from session.models import Session
 
 # Create your models here.
 
 class Message(models.Model):
-    session = models.ForeignKey(User, on_delete=models.CASCADE, related_name="summaries")
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name="summaries")
     role = models.enums
     # USER, AI
     content = models.TextField()
