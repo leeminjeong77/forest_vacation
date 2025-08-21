@@ -48,9 +48,10 @@ def login(request):
     refresh = RefreshToken.for_user(user)
     update_last_login(None, user)
     return Response(
-        {
+        {  
             "refresh_token": str(refresh),
             "access_token": str(refresh.access_token),
+            "user": UserInfoSerializer(user).data,
         },
         status=200,
     )

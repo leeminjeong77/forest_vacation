@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+from decouple import config
 import os
 
 from .. import config
@@ -46,6 +47,10 @@ SIMPLE_JWT = {
 
 # Application definition
 
+# CLOVA OCR KEY
+CLOVA_OCR_SECRET_KEY = config("CLOVA_OCR_SECRET_KEY")
+CLOVA_OCR_INVOKE_URL = config("CLOVA_OCR_INVOKE_URL")
+
 INSTALLED_APPS = [
     # my app
     'user',
@@ -58,7 +63,9 @@ INSTALLED_APPS = [
     'session',
     'summary',
     'message',
+    'receipt',
     # third app
+    'corsheaders',
     'rest_framework',
     'drf_yasg',
     'rest_framework_simplejwt',
@@ -73,6 +80,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware', 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -93,6 +101,33 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",  # JWT를 통한 인증방식 사용
     ),
 }
+
+CORS_ALLOW_METHODS = [  # 허용할 옵션
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [  # 허용할 헤더
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "https://inhu-forest.p-e.kr",
+]
 
 ROOT_URLCONF = 'forest_vacation.urls'
 
@@ -160,6 +195,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / "static"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
