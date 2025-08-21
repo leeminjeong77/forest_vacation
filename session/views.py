@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from openai import OpenAI
 
-import config
+import forest_vacation.config2 as config2
 
 from django.shortcuts import render
 from django.conf import settings
@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 # Create your views here.
 
 client = OpenAI(
-	api_key = config.OPENAI_API_KEY
+	api_key = config2.OPENAI_API_KEY
 )
 
 response = client.responses.create(

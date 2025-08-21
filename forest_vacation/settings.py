@@ -14,7 +14,7 @@ from pathlib import Path
 from datetime import timedelta
 from decouple import config
 
-import config as config2
+import forest_vacation.config2 as config2
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
