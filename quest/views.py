@@ -195,7 +195,7 @@ class QuestActionView(APIView):
                     return Response({"detail": str(e)}, status=400)
                 return Response(
                     {
-                        "detail": "퀘스트가 완료되었습니다.",
+                        "detail": "퀘 스트가 완료되었습니다.",
                         "data": RandomQuestSerializer(rq).data,
                         "extra": result,
                     },
