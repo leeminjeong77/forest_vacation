@@ -36,7 +36,7 @@ system_instruction = """
   After you create the result, please present it in JSON format.  
   The names in the result must be from the provided list.
 
-  Restaurants and Cafes List: "육쌈냉면 인하대점", "면식당 인하대점", "백소정 인하대후문점"
+  Restaurants and Cafes List: {place_list}
   Context: {context}
   Question: {question}
   Answer: {answer}
@@ -44,26 +44,44 @@ system_instruction = """
 
 
 # Helper: call OpenAI to get three places (names) from the fixed list
-def call_chatbot_and_pick_places(context: str, question: str, answer: str) -> list:
-	prompt = system_instruction.format(context=context or "", question=question or "", answer=answer or "")
+def call_chatbot_and_pick_places(context: str, question: str, answer: str, candidates: list[str]) -> list:
+	place_list_str = ", ".join(f'"{n}"' for n in candidates) if candidates else '""'
+	
+	prompt = system_instruction.format(context=context or "", question=question or "", answer=answer or "", place_list=place_list_str,)
+  
 	resp = client.responses.create(
 		model="gpt-4o-mini",
 		input=prompt,
 		store=False,
 	)
-	text = resp.output_text if hasattr(resp, "output_text") else (getattr(resp, "content", "") or "")
+	
+	# text = resp.output_text if hasattr(resp, "output_text") else (getattr(resp, "content", "") or "")
+	text = getattr(resp, "output_text", None) or getattr(resp, "content", "") or ""
+
 	# Very simple JSON-like name extraction fallback
-	candidates = ["육쌈냉면 인하대점", "면식당 인하대점", "백소정 인하대후문점"]
+	# candidates = ["육쌈냉면 인하대점", "면식당 인하대점", "백소정 인하대후문점"]
 	picked = []
 	for name in candidates:
-		if name in text and name not in picked:
+		if name and name in text and name not in picked:
 			picked.append(name)
 			if len(picked) == 3:
 				break
-	# If model didn't echo names, just return all from the fixed list
 	if len(picked) < 3:
-		picked = candidates[:3]
-	return picked
+		remaining = [n for n in candidates if n not in picked]
+		while len(picked) < 3 and remaining:
+			picked.append(remaining.pop(0))  # 또는 random.choice/ random.sample
+	return picked[:3]
+	
+	#picked = []
+	#for name in candidates:
+	#	if name in text and name not in picked:
+	#		picked.append(name)
+	#		if len(picked) == 3:
+	#			break
+	# # If model didn't echo names, just return all from the fixed list
+	#if len(picked) < 3:
+	#	picked = candidates[:3]
+	# return picked
 
 
 # Helper: ensure places and quests exist, then create RandomQuest entries and return info
@@ -119,6 +137,7 @@ def submit_answer(request):
 	msg_seq = int(data.get("msg_seq") or 1)
 	context = data.get("context")
 	prompt_text = data.get("prompt")
+	candidates = list(Place.objects.values_list("name", flat=True))
 	if not all([session_id, user_id, prompt_text]):
 		return Response({"success": False, "error": "session_id, user_id, prompt are required"}, status=400)
 
@@ -131,10 +150,16 @@ def submit_answer(request):
 	session.save(update_fields=["turn_count", "last_message_at"])
 
 	# Call chatbot and create random quests now to be returned in end_session
-	picked_names = call_chatbot_and_pick_places(context=context or "", question=context or "", answer=prompt_text or "")
+	picked_names = call_chatbot_and_pick_places(
+		context=context or "",
+	  question=context or "",
+	  answer=prompt_text or "",
+	  candidates=candidates,)
+	
+	# picked_names = call_chatbot_and_pick_places(context=context or "", question=context or "", answer=prompt_text or "")
 	created = ensure_and_create_random_quests_for_user(session.user, picked_names)
 
-	return Response({"success": True})
+	return Response(created, status=status.HTTP_201_CREATED)
 
 
 @api_view(['POST'])
