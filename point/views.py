@@ -19,16 +19,19 @@ def quest_complete(request):
     user = request.user
     quest_id = serializer.validated_data['quest_id']
     
-     # (1) 영수증 인증 성공 여부 확인
-    verified = Receipt.objects.filter(
-        user=user,
-        quest_id=quest_id,
-        status=Receipt.Status.SUCCESS
-    ).exists()
-
-    if not verified:
-        return Response({"error": "영수증 인증이 완료되지 않았습니다."}, status=400)
-
+    # -----------------------------
+    # TODO: 영수증 인증 개발 완료 시 다시 활성화
+    # 현재는 프론트 OCR 개발 대기 상태라 주석 처리
+    #
+    # verified = Receipt.objects.filter(
+    #     user=user,
+    #     quest_id=quest_id,
+    #     status=Receipt.Status.SUCCESS
+    # ).exists()
+    # if not verified:
+    #     return Response({"error": "영수증 인증이 완료되지 않았습니다."}, status=400)
+    # -----------------------------
+    
    # (2) 진행중 or 완료 상태 확인
     try:
         rq = RandomQuest.objects.get(
