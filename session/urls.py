@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # path("", views.user_reward_list),
-    # path("<int:pk>/", views.use_user_reward),
+	path("start/", views.create_session),
+	path("answer/", views.submit_answer),
+	path("end/", views.end_session_and_recommend),
 ]
