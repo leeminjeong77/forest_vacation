@@ -52,7 +52,7 @@ def call_chatbot_and_pick_places(context: str, question: str, answer: str, candi
 	resp = client.responses.create(
 		model="gpt-4o-mini",
 		input=prompt,
-		store=False,
+		store=True,
 	)
 	
 	# text = resp.output_text if hasattr(resp, "output_text") else (getattr(resp, "content", "") or "")
