@@ -128,12 +128,13 @@ def create_session(request):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def submit_answer(request):
 	# Expected JSON: {"session_id", "user_id", "msg_seq", "context", "prompt"}
+	user = request.user
+	user_id = user.id
 	data = request.data or {}
 	session_id = data.get("session_id")
-	user_id = data.get("user_id")
 	msg_seq = int(data.get("msg_seq") or 1)
 	context = data.get("context")
 	prompt_text = data.get("prompt")
