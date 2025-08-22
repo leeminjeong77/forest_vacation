@@ -23,26 +23,30 @@ class DailyQuestView(APIView):
 
     def get(self, request):
         user = request.user
-        today = timezone.now().date()
+        today = timezone.localdate()
 
-        # 오늘 ACCEPTED 된 퀘스트 유지
+        # 오늘 ACCEPTED 된 퀘스트 유지 (정렬 고정)
         accepted_rqs = list(RandomQuest.objects.filter(
             user=user,
             created_at__date=today,
             status=RandomQuest.Status.ACCEPTED
-        ))
+        ).order_by('created_at', 'id'))
 
-        # 오늘 RANDOM_LIST 중 CLEAR/EXPIRED 제외, 3개 한도
-        random_rqs = list(RandomQuest.objects.filter(
+        # 오늘 RANDOM_LIST 조회 (정렬 고정)
+        random_rqs_qs = RandomQuest.objects.filter(
             user=user,
             created_at__date=today,
             status=RandomQuest.Status.RANDOM_LIST
-        )[: (3 - len(accepted_rqs))])
+        ).order_by('created_at', 'id')
+        random_rqs = list(random_rqs_qs)
 
-        all_rqs = accepted_rqs + random_rqs
+        # 응답: ACCEPTED 우선 + RANDOM_LIST로 채워 최대 3개
+        fill = max(0, 3 - len(accepted_rqs))
+        all_rqs = accepted_rqs + random_rqs[:fill]
 
-        # 부족하면 새로 채우기
-        if len(all_rqs) < 3:
+        # daily는 "하루 최초 호출"에서만 생성
+        # 이미 오늘 RANDOM_LIST가 하나라도 있으면 → 추가 생성 금지
+        if not random_rqs and len(all_rqs) < 3:
             excluded_ids = RandomQuest.objects.filter(
                 user=user,
                 created_at__date=today,
@@ -76,7 +80,7 @@ class RefreshRandomQuestView(APIView):
     @transaction.atomic
     def post(self, request):
         user = request.user
-        today = timezone.now().date()
+        today = timezone.localdate()
 
         # 오늘 새로고침 기록 확인
         if RefreshLog.objects.filter(user=user, refreshed_at__date=today).exists():
@@ -95,7 +99,6 @@ class RefreshRandomQuestView(APIView):
         excluded_ids = RandomQuest.objects.filter(
             user=user,
             created_at__date=today,
-
             status__in=[RandomQuest.Status.CLEAR, RandomQuest.Status.EXPIRED, RandomQuest.Status.ACCEPTED]
         ).values_list("quest_id", flat=True)
 
@@ -132,6 +135,7 @@ class DayResetView(APIView):
 
     def post(self, request):
         user = request.user
+        today = timezone.localdate()
 
         # 1) EXPIRED → RANDOM_LIST 복구
         expired_updated = RandomQuest.objects.filter(
@@ -139,8 +143,10 @@ class DayResetView(APIView):
             status=RandomQuest.Status.EXPIRED
         ).update(status=RandomQuest.Status.RANDOM_LIST, updated_at=timezone.now())
 
-        # 2) 새로고침 제한 리셋 → 오늘 기록 삭제
-        deleted_logs, _ = RefreshLog.objects.filter(user=user).delete()
+        # 2) 새로고침 제한 리셋 → 오늘 기록만 삭제 (refreshed_at 사용)
+        deleted_logs, _ = RefreshLog.objects.filter(
+            user=user, refreshed_at__date=today
+        ).delete()
 
         return Response(
             {
@@ -188,14 +194,11 @@ class QuestActionView(APIView):
             if rq.status == RandomQuest.Status.ACCEPTED:
                 try:
                     result = rq.clear()
-                    
-            
-
                 except ValueError as e:
                     return Response({"detail": str(e)}, status=400)
                 return Response(
                     {
-                        "detail": "퀘 스트가 완료되었습니다.",
+                        "detail": "퀘스트가 완료되었습니다.",
                         "data": RandomQuestSerializer(rq).data,
                         "extra": result,
                     },
