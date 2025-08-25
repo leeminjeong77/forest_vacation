@@ -1,2 +1,0 @@
-OPENAI_API_KEY = "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"
-SECRET_KEY = 'django-insecure-y(v_l)(o(y-cv6q110yy2s)i8t&lci)xeepcnp%d!95%n3n0*@'
